@@ -274,7 +274,8 @@ function renderCalendar() {
   for (let i = 0; i < trailing; i++) cells += '<div class="day blank"></div>';
 
   $('#view').innerHTML = `
-    <div class="card">
+    <div class="page-cal">
+    <div class="card cal-card">
       <div class="cal-head">
         <button class="cal-title-btn" data-act="open-month-picker" aria-label="选择月份">
           ${calYear}年${calMonth + 1}月 <span class="chev">▾</span>
@@ -297,7 +298,7 @@ function renderCalendar() {
         <span>下方：农历 · 训练部位</span>
       </div>
     </div>
-    <div style="height:12px"></div>
+    </div>
   `;
 }
 
