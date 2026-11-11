@@ -55,6 +55,50 @@ function fmtShort(iso) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
+
+/* ---------------- 农历（1900-2099） ---------------- */
+const LUNAR_INFO = [0x04bd8,0x04ae0,0x0a570,0x054d5,0x0d260,0x0d950,0x16554,0x056a0,0x09ad0,0x055d2,0x04ae0,0x0a5b6,0x0a4d0,0x0d250,0x1d255,0x0b540,0x0d6a0,0x0ada2,0x095b0,0x14977,0x04970,0x0a4b0,0x0b4b5,0x06a50,0x06d40,0x1ab54,0x02b60,0x09570,0x052f2,0x04970,0x06566,0x0d4a0,0x0ea50,0x06e95,0x05ad0,0x02b60,0x186e3,0x092e0,0x1c8d7,0x0c950,0x0d4a0,0x1d8a6,0x0b550,0x056a0,0x1a5b4,0x025d0,0x092d0,0x0d2b2,0x0a950,0x0b557,0x06ca0,0x0b550,0x15355,0x04da0,0x0a5d0,0x14573,0x052b0,0x0a9a8,0x0e950,0x06aa0,0x0aea6,0x0ab50,0x04b60,0x0aae4,0x0a570,0x05260,0x0f263,0x0d950,0x05b57,0x056a0,0x096d0,0x04dd5,0x04ad0,0x0a4d0,0x0d4d4,0x0d250,0x0d558,0x0b540,0x0b5a0,0x195a6,0x095b0,0x049b0,0x0a974,0x0a4b0,0x0b27a,0x06a50,0x06d40,0x0af46,0x0ab60,0x09570,0x04af5,0x04970,0x064b0,0x074a3,0x0ea50,0x06b58,0x05ac0,0x0ab60,0x096d5,0x092e0,0x0c960,0x0d954,0x0d4a0,0x0da50,0x07552,0x056a0,0x0abb7,0x025d0,0x092d0,0x0cab5,0x0a950,0x0b4a0,0x0baa4,0x0ad50,0x055d9,0x04ba0,0x0a5b0,0x15176,0x052b0,0x0a930,0x07954,0x06aa0,0x0ad50,0x05b52,0x04b60,0x0a6e6,0x0a4e0,0x0d260,0x0ea65,0x0d530,0x05aa0,0x076a3,0x096d0,0x04afb,0x04ad0,0x0a4d0,0x1d0b6,0x0d250,0x0d520,0x0dd45,0x0b5a0,0x056d0,0x055b2,0x049b0,0x0a577,0x0a4b0,0x0aa50,0x1b255,0x06d20,0x0ada0,0x14b63,0x09370,0x049f8,0x04970,0x064b0,0x168a6,0x0ea50,0x06aa0,0x1a6c4,0x0aae0,0x092e0,0x0d2e3,0x0c960,0x0d557,0x0d4a0,0x0da50,0x05d55,0x056a0,0x0a6d0,0x055d4,0x052d0,0x0a9b8,0x0a950,0x0b4a0,0x0b6a6,0x0ad50,0x055a0,0x0aba4,0x0a5b0,0x052b0,0x0b273,0x06930,0x07337,0x06aa0,0x0ad50,0x14b55,0x04b60,0x0a570,0x054e4,0x0d160,0x0e968,0x0d520,0x0daa0,0x16aa6,0x056d0,0x04ae0,0x0a9d4,0x0a2d0,0x0d150,0x0f252];
+const LUNAR_MONTH_NAMES = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+const LUNAR_DAY_NAMES = ['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];
+function lunarLeapMonth(y) { return LUNAR_INFO[y - 1900] & 0xf; }
+function lunarLeapDays(y) { const l = lunarLeapMonth(y); return l ? ((LUNAR_INFO[y - 1900] & 0x10000) ? 30 : 29) : 0; }
+function lunarMonthDays(y, m) { return (LUNAR_INFO[y - 1900] & (0x10000 >> m)) ? 30 : 29; }
+function lunarYearDays(y) { let sum = 0; for (let m = 1; m <= 12; m++) sum += lunarMonthDays(y, m); return sum + lunarLeapDays(y); }
+function solarToLunar(y, m, d) {
+  if (y < 1900 || y > 2099) return null;
+  let offset = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1900, 0, 31)) / 86400000);
+  let year = 1900;
+  while (year < 2100) {
+    const days = lunarYearDays(year);
+    if (offset < days) break;
+    offset -= days; year++;
+  }
+  const leap = lunarLeapMonth(year);
+  for (let month = 1; month <= 12; month++) {
+    const len = lunarMonthDays(year, month);
+    if (offset < len) return { year, month, day: offset + 1, isLeap: false };
+    offset -= len;
+    if (leap === month) {
+      const ll = lunarLeapDays(year);
+      if (offset < ll) return { year, month, day: offset + 1, isLeap: true };
+      offset -= ll;
+    }
+  }
+  return null;
+}
+function lunarOf(iso) {
+  const d = parseISO(iso);
+  return solarToLunar(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+function lunarDayText(ld) {
+  if (!ld) return '';
+  if (ld.day === 1) return (ld.isLeap ? '闰' : '') + LUNAR_MONTH_NAMES[ld.month - 1] + '月';
+  return LUNAR_DAY_NAMES[ld.day - 1] || '';
+}
+function lunarFullText(ld) {
+  if (!ld) return '';
+  return (ld.isLeap ? '闰' : '') + LUNAR_MONTH_NAMES[ld.month - 1] + '月' + LUNAR_DAY_NAMES[ld.day - 1];
+}
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -71,7 +115,7 @@ function toast(msg) {
 }
 
 /* ---------------- 数据 ---------------- */
-function emptyState() { return { gymDays: {}, parts: {}, entries: [], meta: { createdAt: new Date().toISOString() } }; }
+function emptyState() { return { gymDays: {}, parts: {}, entries: [], metrics: [], meta: { createdAt: new Date().toISOString() } }; }
 
 function normalizeState(raw) {
   const s = emptyState();
@@ -91,6 +135,15 @@ function normalizeState(raw) {
       sets: Array.isArray(e.sets) ? e.sets.map(x => ({ w: Number(x.w) || 0, r: Number(x.r) || 0 })) : [],
       note: e.note || ''
     }));
+  }
+  if (Array.isArray(raw.metrics)) {
+    s.metrics = raw.metrics.filter(m => m && typeof m.date === 'string').map(m => ({
+      id: m.id || uid(),
+      date: m.date,
+      weight: m.weight === '' || m.weight == null ? null : Number(m.weight),
+      bodyFat: m.bodyFat === '' || m.bodyFat == null ? null : Number(m.bodyFat),
+      note: m.note || ''
+    })).filter(m => m.weight != null || m.bodyFat != null);
   }
   if (raw.meta) s.meta = Object.assign(s.meta, raw.meta);
   return s;
@@ -208,9 +261,12 @@ function renderCalendar() {
     const hasEntry = state.entries.some(e => e.date === iso);
     const parts = dayParts(iso);
     const partText = parts.length ? parts.slice(0, 2).join('·') : '';
+    const ld = solarToLunar(calYear, calMonth + 1, d);
+    const lunarText = lunarDayText(ld);
     const cls = ['day', gym ? 'gym' : '', iso === today ? 'today' : ''].filter(Boolean).join(' ');
     cells += `<button class="${cls}" data-act="open-day" data-date="${iso}">
       <span class="dnum">${d}</span>
+      <span class="dlunar">${esc(lunarText)}</span>
       ${partText ? `<span class="dparts">${esc(partText)}</span>` : (hasEntry ? '<i class="dot"></i>' : '')}
     </button>`;
   }
@@ -238,7 +294,7 @@ function renderCalendar() {
       <div class="cal-legend">
         <span><i></i>训练日</span>
         <span><i class="dotline"></i>有记录</span>
-        <span>数字下方 = 训练部位</span>
+        <span>下方：农历 · 训练部位</span>
       </div>
     </div>
     <div style="height:12px"></div>
@@ -253,7 +309,7 @@ function openDaySheet(iso) {
   const html = `
     <div class="sheet-grab"></div>
     <h3>${esc(fmtDateCN(iso))}</h3>
-    <div class="sub">${gym ? '已标记为训练日' : '还没有标记训练日'}</div>
+    <div class="sub">${gym ? '已标记为训练日' : '还没有标记训练日'} · 农历${esc(lunarFullText(lunarOf(iso)))}</div>
     <div class="setting-row" style="border-bottom:0;padding:2px 2px 10px">
       <div><div class="t">今天去了健身房</div><div class="s">打开后日历上会显示红色标记</div></div>
       <label class="switch"><input type="checkbox" id="gymToggle" ${gym ? 'checked' : ''}><i></i></label>
@@ -373,7 +429,7 @@ function renderRecords() {
   $('#view').innerHTML = `
     ${dates.length ? groups : `<div class="empty"><span class="big">📋</span>还没有记录<br><span class="tiny">点右下角 + 添加第一条训练记录</span></div>`}
     <div class="fab" data-act="add-entry" data-date="${todayISO()}" role="button" aria-label="添加记录">+</div>
-    <div style="height:40px"></div>
+    <div style="height:96px"></div>
   `;
 }
 
@@ -555,7 +611,8 @@ function smoothPath(coords) {
   return d;
 }
 
-function buildChartSVG(points) {
+function buildChartSVG(points, fmt) {
+  const F = fmt || { axis: v => Math.round(v * 10) / 10, value: v => fmtKg(v) };
   const W = 360, H = 240, L = 44, R = 14, T = 26, B = 36;
   const iw = W - L - R, ih = H - T - B;
   if (!points.length) return '';
@@ -581,7 +638,7 @@ function buildChartSVG(points) {
     const v = lo + (hi - lo) * i / gridN;
     const y = yAt(v);
     grid += `<line class="chart-grid" x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}"/>`;
-    grid += `<text class="chart-axis" x="${L - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${fmtAxis(v, chartMetric)}</text>`;
+    grid += `<text class="chart-axis" x="${L - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${F.axis(v)}</text>`;
   }
 
   const coords = points.map((p, i) => ({ x: xAt(i), y: yAt(p.value), p }));
@@ -625,7 +682,7 @@ function buildChartSVG(points) {
   if (chartSel >= 0 && chartSel < coords.length) {
     const c = coords[chartSel];
     const tx = Math.min(Math.max(c.x, L + 34), W - R - 34);
-    const label = `${fmtShort(c.p.date)} · ${fmtMetric(c.p.value)}`;
+    const label = `${fmtShort(c.p.date)} · ${F.value(c.p.value)}`;
     const ty = Math.max(c.y - 14, 16);
     const w = label.length * 5.6 + 16;
     tag = `<rect x="${(tx - w / 2).toFixed(1)}" y="${(ty - 12).toFixed(1)}" width="${w.toFixed(1)}" height="17" rx="8.5" class="chart-tag-bg"/>
@@ -667,6 +724,10 @@ function renderCharts() {
   const delta = lastV - firstV;
   const isVol = chartMetric === 'vol';
   const prHit = values.length > 1 && lastV >= maxV - 0.001;
+  const chartFmt = {
+    axis: v => fmtAxis(v, chartMetric),
+    value: v => isVol ? (Math.round(v) + 'kg') : fmtKg(v)
+  };
 
   const rows = points.slice().reverse().slice(0, 10).map((p, i, arr) => {
     const prev = arr[i + 1];
@@ -699,7 +760,7 @@ function renderCharts() {
         </div>
         <div class="chart-big">${isVol ? Math.round(lastV) + '<i>kg</i>' : fmtKg(lastV).replace('kg', '<i>kg</i>')}</div>
       </div>
-      <div class="chart-wrap">${buildChartSVG(points)}</div>
+      <div class="chart-wrap">${buildChartSVG(points, chartFmt)}</div>
       <div class="chart-stats">
         <div class="stat"><b>${points.length}</b><span>训练次数</span></div>
         <div class="stat"><b>${isVol ? Math.round(maxV) : fmtKg(maxV)}</b><span>${isVol ? '最高容量(kg)' : '最重'}</span></div>
@@ -716,6 +777,185 @@ function renderCharts() {
   `;
 }
 
+/* ---------------- 身体数据（体重 / 体脂） ---------------- */
+let bodyMetric = 'weight'; // 'weight' | 'fat'
+
+function bodySeries(kind) {
+  const key = kind === 'fat' ? 'bodyFat' : 'weight';
+  return state.metrics
+    .filter(m => m[key] != null && !isNaN(m[key]))
+    .map(m => ({ date: m.date, value: Number(m[key]) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function fmtBody(v, kind) {
+  if (v == null || isNaN(v)) return '--';
+  return (Math.round(v * 10) / 10) + (kind === 'fat' ? '%' : 'kg');
+}
+
+function renderBody() {
+  const list = state.metrics.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const latest = list[0];
+  const points = bodySeries(bodyMetric);
+  const vals = points.map(p => p.value);
+  const maxV = vals.length ? Math.max(...vals) : 0;
+  const minV = vals.length ? Math.min(...vals) : 0;
+  const lastV = vals.length ? vals[vals.length - 1] : 0;
+  const firstV = vals.length ? vals[0] : 0;
+  const delta = lastV - firstV;
+  const kind = bodyMetric === 'fat' ? 'fat' : 'weight';
+  const fmt = { axis: v => Math.round(v * 10) / 10, value: v => fmtBody(v, kind) };
+
+  const latestWeight = latest && latest.weight != null ? fmtBody(latest.weight, 'weight') : '--';
+  const latestFat = latest && latest.bodyFat != null ? fmtBody(latest.bodyFat, 'fat') : '--';
+  const prev = list[1];
+  let wDelta = null;
+  if (latest && latest.weight != null && prev && prev.weight != null) wDelta = latest.weight - prev.weight;
+  const wDeltaText = wDelta == null ? '' : (wDelta > 0 ? '+' : '') + (Math.round(wDelta * 10) / 10) + 'kg';
+
+  const rows = list.slice(0, 30).map(m => {
+    const w = m.weight != null ? fmtBody(m.weight, 'weight') : '—';
+    const f = m.bodyFat != null ? fmtBody(m.bodyFat, 'fat') : '';
+    return `<div class="chart-row" data-act="edit-metric" data-id="${m.id}">
+      <span class="d">${esc(fmtShort(m.date))}</span>
+      <span class="v">${w}${f ? ' · ' + f : ''}</span>
+      <span class="muted tiny">${m.note ? esc(m.note) : ''}</span>
+    </div>`;
+  }).join('');
+
+  const seg = [['weight', '体重'], ['fat', '体脂率']].map(([k, label]) =>
+    `<button class="${bodyMetric === k ? 'active' : ''}" data-act="body-metric" data-metric="${k}">${label}</button>`).join('');
+
+  $('#view').innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <div class="body-top">
+        <div class="body-cell">
+          <div class="body-label">最近体重</div>
+          <div class="body-value">${latestWeight}</div>
+          ${wDeltaText ? `<div class="body-delta ${wDelta > 0 ? 'up' : (wDelta < 0 ? 'down' : 'flat')}">${wDelta > 0 ? '▲' : (wDelta < 0 ? '▼' : '—')} ${wDeltaText} 较上次</div>` : '<div class="body-delta muted">还没有记录</div>'}
+        </div>
+        <div class="body-cell">
+          <div class="body-label">最近体脂率</div>
+          <div class="body-value">${latestFat}</div>
+          <div class="body-delta muted">${latestFat === '--' ? '点右下角 + 添加' : '手动录入体脂秤读数'}</div>
+        </div>
+      </div>
+    </div>
+    <div class="seg">${seg}</div>
+    ${points.length ? `
+    <div class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">${bodyMetric === 'fat' ? '体脂率' : '体重'}<span class="chart-metric">变化趋势</span></div>
+          <div class="chart-sub">${fmtShort(points[0].date)} – ${fmtShort(points[points.length - 1].date)} · 共 ${points.length} 次</div>
+        </div>
+        <div class="chart-big">${fmtBody(lastV, kind)}</div>
+      </div>
+      <div class="chart-wrap">${buildChartSVG(points, fmt)}</div>
+      <div class="chart-stats">
+        <div class="stat"><b>${points.length}</b><span>记录次数</span></div>
+        <div class="stat"><b>${fmtBody(maxV, kind)}</b><span>最高</span></div>
+        <div class="stat"><b>${fmtBody(minV, kind)}</b><span>最低</span></div>
+        <div class="stat"><b class="${bodyMetric === 'weight' ? (delta <= 0 ? 'accent' : 'muted') : (delta <= 0 ? 'accent' : 'muted')}">${delta > 0 ? '+' : ''}${Math.round(delta * 10) / 10}${kind === 'fat' ? '%' : 'kg'}</b><span>对比首次</span></div>
+      </div>
+    </div>
+    <div class="card chart-list" style="margin-top:14px">
+      <div class="section-title" style="margin:0 0 4px"><h2 style="font-size:15px">身体记录</h2><span class="muted tiny">点记录可修改</span></div>
+      ${rows}
+    </div>` : `
+    <div class="empty"><span class="big">⚖️</span>还没有体重/体脂记录<br><span class="tiny">点右下角 + 添加第一条</span></div>`}
+    <div class="fab" data-act="add-metric" data-date="${todayISO()}" role="button" aria-label="添加身体数据">+</div>
+    <div style="height:96px"></div>
+  `;
+}
+
+function openMetricSheet(dateISO, metricId) {
+  const editing = metricId ? state.metrics.find(m => m.id === metricId) : null;
+  const date = editing ? editing.date : (dateISO || todayISO());
+  const weight = editing && editing.weight != null ? editing.weight : '';
+  const bodyFat = editing && editing.bodyFat != null ? editing.bodyFat : '';
+  const note = editing ? editing.note : '';
+  const html = `
+    <div class="sheet-grab"></div>
+    <h3>${editing ? '编辑身体数据' : '记录体重 / 体脂'}</h3>
+    <div class="sub">${esc(fmtDateCN(date))}</div>
+    <div class="field">
+      <label>日期</label>
+      <input class="input" type="date" id="mDate" value="${date}">
+    </div>
+    <div class="metric-grid">
+      <div class="field">
+        <label>体重 (kg)</label>
+        <input class="input" type="number" inputmode="decimal" step="0.1" id="mWeight" placeholder="例如 65.5" value="${weight}">
+      </div>
+      <div class="field">
+        <label>体脂率 (%)</label>
+        <input class="input" type="number" inputmode="decimal" step="0.1" id="mFat" placeholder="例如 18.5" value="${bodyFat}">
+      </div>
+    </div>
+    <div class="field">
+      <label>备注（可选）</label>
+      <input class="input" id="mNote" placeholder="例如：晨起空腹" value="${esc(note)}">
+    </div>
+    <div class="btn-row">
+      ${editing ? '<button class="btn danger" data-act="del-metric" data-id="' + editing.id + '">删除</button>' : ''}
+      <button class="btn primary" data-act="save-metric" data-id="${editing ? editing.id : ''}">保存</button>
+    </div>
+  `;
+  openSheet(html);
+}
+
+function saveMetricFromSheet(metricId) {
+  const date = $('#mDate').value;
+  const wRaw = $('#mWeight').value.trim();
+  const fRaw = $('#mFat').value.trim();
+  const note = $('#mNote').value.trim();
+  if (!date) { toast('请选择日期'); return; }
+  const weight = wRaw === '' ? null : parseFloat(wRaw);
+  const bodyFat = fRaw === '' ? null : parseFloat(fRaw);
+  if ((weight == null || isNaN(weight)) && (bodyFat == null || isNaN(bodyFat))) { toast('体重和体脂至少填一个'); return; }
+  const rec = { id: metricId || uid(), date, weight: weight, bodyFat: bodyFat, note };
+  if (metricId) {
+    const idx = state.metrics.findIndex(m => m.id === metricId);
+    if (idx >= 0) state.metrics[idx] = rec; else state.metrics.push(rec);
+  } else {
+    state.metrics.push(rec);
+  }
+  saveState(); closeSheet(); renderBody(); toast('已保存 ✓');
+}
+
+/* ---------------- 导出到苹果日历 ---------------- */
+function icsEscape(s) {
+  return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+}
+function nextDayISO(iso) {
+  const d = parseISO(iso); d.setDate(d.getDate() + 1); return isoDate(d);
+}
+function exportICS() {
+  const dates = new Set(Object.keys(state.gymDays).filter(d => state.gymDays[d]));
+  state.entries.forEach(e => dates.add(e.date));
+  if (!dates.size) { toast('还没有训练记录'); return; }
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//FitLog//CN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  [...dates].sort().forEach(iso => {
+    const parts = dayParts(iso);
+    const list = entriesOn(iso);
+    const summary = '🏋️ 健身' + (parts.length ? '：' + parts.join('·') : '');
+    const desc = list.map(e => `${e.exercise} ${entrySetsText(e)}`).join('\n') || '训练日打卡';
+    lines.push('BEGIN:VEVENT', `UID:${iso}@fitlog`, `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${iso.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${nextDayISO(iso).replace(/-/g, '')}`,
+      `SUMMARY:${icsEscape(summary)}`, `DESCRIPTION:${icsEscape(desc)}`, 'END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `健身记录-日历-${todayISO()}.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast('已生成日历文件，用「日历」App 打开导入');
+}
+
 /* ---------------- 数据 / 设置 ---------------- */
 function renderSettings() {
   const totalGym = Object.keys(state.gymDays).filter(d => state.gymDays[d]).length;
@@ -727,7 +967,7 @@ function renderSettings() {
       <div class="chart-stats" style="margin:0">
         <div class="stat"><b>${totalGym}</b><span>训练日</span></div>
         <div class="stat"><b>${state.entries.length}</b><span>记录条数</span></div>
-        <div class="stat"><b>${exCount}</b><span>动作种类</span></div>
+        <div class="stat"><b>${(state.metrics || []).length}</b><span>身体记录</span></div>
         <div class="stat"><b>${(bytes / 1024).toFixed(1)}K</b><span>数据大小</span></div>
       </div>
     </div>
@@ -745,6 +985,10 @@ function renderSettings() {
         <button class="action" data-act="import">导入</button>
       </div>
       <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+      <div class="setting-row">
+        <div><div class="t">同步到苹果日历</div><div class="s">导出 .ics 文件，用「日历」App 打开即可导入训练日</div></div>
+        <button class="action" data-act="export-ics">导出</button>
+      </div>
       <div class="setting-row">
         <div><div class="t">填充示例数据</div><div class="s">生成 8 周示例训练，方便先看曲线效果</div></div>
         <button class="action" data-act="seed-demo">生成</button>
@@ -807,7 +1051,7 @@ function seedDemo() {
 function buildDemoState() {
   const exercises = ['深蹲', '硬拉', '卧推', '杠铃划船', '哑铃弯举', '肩推'];
   const baselines = { '深蹲': 60, '硬拉': 80, '卧推': 45, '杠铃划船': 50, '哑铃弯举': 10, '肩推': 25 };
-  const entries = []; const gymDays = {};
+  const entries = []; const gymDays = {}; const metrics = [];
   const today = new Date();
   const start = new Date(today); start.setDate(today.getDate() - 55);
   let day = new Date(start);
@@ -833,11 +1077,21 @@ function buildDemoState() {
     }
     day.setDate(day.getDate() + 1);
   }
-  return { gymDays, parts: {}, entries, meta: { demo: true, createdAt: new Date().toISOString() } };
+  for (let i = 0; i < 20; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i * 3);
+    if (d > today) break;
+    metrics.push({
+      id: uid(), date: isoDate(d),
+      weight: Math.round((70 - i * 0.28) * 10) / 10,
+      bodyFat: Math.round((20 - i * 0.18) * 10) / 10,
+      note: i === 0 ? '晨起空腹' : ''
+    });
+  }
+  return { gymDays, parts: {}, entries, metrics, meta: { demo: true, createdAt: new Date().toISOString() } };
 }
 
 /* ---------------- 路由 / 渲染 ---------------- */
-const TITLES = { calendar: '日历', records: '记录', charts: '曲线', settings: '数据' };
+const TITLES = { calendar: '日历', records: '记录', charts: '曲线', body: '身体', settings: '数据' };
 
 function render() {
   $('#viewTitle').textContent = TITLES[tab] || '健身记录';
@@ -845,6 +1099,7 @@ function render() {
   if (tab === 'calendar') renderCalendar();
   else if (tab === 'records') renderRecords();
   else if (tab === 'charts') renderCharts();
+  else if (tab === 'body') renderBody();
   else renderSettings();
 }
 
@@ -901,9 +1156,30 @@ document.addEventListener('click', (ev) => {
     case 'range':
       chartRange = el.dataset.range; chartSel = -1; renderCharts(); break;
     case 'export': exportData(); break;
+    case 'export-ics': exportICS(); break;
     case 'import': $('#importFile')?.click(); break;
     case 'seed-demo': seedDemo(); break;
     case 'clear-all': clearAll(); break;
+    case 'add-metric': openMetricSheet(date); break;
+    case 'edit-metric': {
+      const id = el.dataset.id || el.closest('[data-id]')?.dataset.id;
+      const m = state.metrics.find(x => x.id === id);
+      if (!m) return;
+      closeSheet();
+      setTimeout(() => openMetricSheet(m.date, m.id), 120);
+      break;
+    }
+    case 'save-metric': saveMetricFromSheet(el.dataset.id || ''); break;
+    case 'del-metric': {
+      if (!confirm('确定删除这条身体记录吗？')) return;
+      state.metrics = state.metrics.filter(m => m.id !== el.dataset.id);
+      saveState(); closeSheet(); renderBody(); toast('已删除');
+      break;
+    }
+    case 'body-metric':
+      bodyMetric = el.dataset.metric === 'fat' ? 'fat' : 'weight';
+      renderBody();
+      break;
     case 'open-month-picker': openMonthPicker(); break;
     case 'pick-year-prev':
       pickYear--; refreshMonthPicker(); break;
@@ -981,7 +1257,8 @@ document.getElementById('btnToday').addEventListener('click', () => {
   // 供调试/自动化测试使用（正常使用无影响）
   window.__fitlog = {
     get state() { return state; },
-    saveState, render, switchTab, openEntrySheet, openDaySheet, closeSheet
+    saveState, render, switchTab, openEntrySheet, openDaySheet, closeSheet,
+    lunarOf, solarToLunar
   };
 
   // 预览用：?sheet=day / ?sheet=entry 直接打开对应弹层（方便截图演示）
