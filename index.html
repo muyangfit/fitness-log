@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="健身记录">
+<meta name="theme-color" content="#f6f7f9">
+<title>健身记录</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <h1 id="viewTitle">日历</h1>
+    <button class="icon-btn" id="btnToday" title="回到今天">今天</button>
+  </div>
+</header>
+
+<main id="view" aria-live="polite"></main>
+
+<nav class="tabbar" role="tablist">
+  <button class="tab active" data-tab="calendar" role="tab">
+    <span class="tab-ico">🗓</span><span class="tab-label">日历</span>
+  </button>
+  <button class="tab" data-tab="records" role="tab">
+    <span class="tab-ico">📋</span><span class="tab-label">记录</span>
+  </button>
+  <button class="tab" data-tab="charts" role="tab">
+    <span class="tab-ico">📈</span><span class="tab-label">曲线</span>
+  </button>
+  <button class="tab" data-tab="settings" role="tab">
+    <span class="tab-ico">⚙️</span><span class="tab-label">数据</span>
+  </button>
+</nav>
+
+<div id="sheetHost"></div>
+<div id="toast" class="toast" role="status"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
