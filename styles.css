@@ -110,10 +110,10 @@ main{display:block;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touc
 .cal-week span{text-align:center;font-size:11px;color:var(--muted);font-weight:600}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .day{
-  position:relative;aspect-ratio:1/1;border-radius:14px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;aspect-ratio:1/1.2;border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
   font-size:15px;font-weight:600;color:var(--text);
-  background:transparent;
+  background:transparent;padding:2px 1px;
 }
 .day.blank{visibility:hidden}
 .day.today{box-shadow:inset 0 0 0 1.5px var(--accent)}
@@ -122,12 +122,17 @@ main{display:block;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touc
 .day.gym .dot{background:rgba(255,255,255,.85)}
 .day:active{transform:scale(.94)}
 .day .dot{
-  position:absolute;bottom:8px;width:5px;height:5px;border-radius:50%;
+  position:absolute;bottom:7px;width:4px;height:4px;border-radius:50%;
   background:var(--accent);opacity:.9;
 }
-.day .dnum{font-size:15px;font-weight:600;line-height:1.1}
+.day .dnum{font-size:14px;font-weight:600;line-height:1.06}
+.day .dlunar{
+  font-size:7.5px;line-height:1.12;font-weight:500;color:var(--muted);
+  max-width:100%;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.day.gym .dlunar{color:rgba(255,255,255,.72)}
 .day .dparts{
-  font-size:8.5px;line-height:1.15;font-weight:600;
+  font-size:7.5px;line-height:1.15;font-weight:700;
   color:var(--muted);max-width:100%;padding:0 3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
@@ -217,6 +222,17 @@ main{display:block;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touc
 .range-row{display:flex;gap:8px;margin:0 0 12px;justify-content:flex-end}
 .range-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;font-size:12px;font-weight:600;color:var(--muted)}
 .range-chip.active{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+
+/* 身体数据（体重 / 体脂） */
+.body-top{display:flex;gap:10px}
+.body-cell{flex:1;background:var(--bg-soft);border-radius:16px;padding:14px 12px}
+.body-label{font-size:11.5px;color:var(--muted);font-weight:600}
+.body-value{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-top:4px}
+.body-delta{font-size:11.5px;margin-top:6px;font-weight:600}
+.body-delta.up{color:var(--accent)}
+.body-delta.down{color:#57c07f}
+.body-delta.flat{color:var(--muted)}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chart-wrap{position:relative}
 .chart-wrap svg{display:block;width:100%;height:auto}
 .chart-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
@@ -299,9 +315,9 @@ main{display:block;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touc
   background:var(--card);
   border-top:1px solid var(--line);
 }
-.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 12px;border-radius:14px;color:var(--muted)}
-.tab .tab-ico{font-size:20px;line-height:1;filter:grayscale(1);opacity:.55}
-.tab .tab-label{font-size:10.5px;font-weight:600}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px;border-radius:14px;color:var(--muted)}
+.tab .tab-ico{font-size:19px;line-height:1;filter:grayscale(1);opacity:.55}
+.tab .tab-label{font-size:10px;font-weight:600}
 .tab.active{color:var(--accent)}
 .tab.active .tab-ico{filter:none;opacity:1}
 
