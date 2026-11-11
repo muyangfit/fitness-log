@@ -10,8 +10,26 @@ let state = null;
 let tab = 'calendar';
 let calYear, calMonth;
 let chartExercise = '';
-let chartMetric = 'max';   // 'max' | 'e1rm'
+let chartMetric = 'max';   // 'max' | 'e1rm' | 'vol'
 let chartSel = -1;
+let chartRange = 'all';    // 'all' | '90' | '30'
+
+/* ---------------- 主题 ---------------- */
+const THEME_KEY = 'fitlog.theme';
+let theme = 'dark';
+try { theme = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) {}
+function applyTheme() {
+  document.documentElement.classList.toggle('light', theme === 'light');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#f6f7f9' : '#0b0c0f');
+}
+function setTheme(t) {
+  theme = t === 'light' ? 'light' : 'dark';
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+  applyTheme();
+  render();
+}
+applyTheme();
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -53,12 +71,18 @@ function toast(msg) {
 }
 
 /* ---------------- 数据 ---------------- */
-function emptyState() { return { gymDays: {}, entries: [], meta: { createdAt: new Date().toISOString() } }; }
+function emptyState() { return { gymDays: {}, parts: {}, entries: [], meta: { createdAt: new Date().toISOString() } }; }
 
 function normalizeState(raw) {
   const s = emptyState();
   if (!raw || typeof raw !== 'object') return s;
   if (raw.gymDays && typeof raw.gymDays === 'object') s.gymDays = raw.gymDays;
+  if (raw.parts && typeof raw.parts === 'object') {
+    s.parts = {};
+    Object.keys(raw.parts).forEach(k => {
+      if (Array.isArray(raw.parts[k])) s.parts[k] = raw.parts[k].filter(x => typeof x === 'string');
+    });
+  }
   if (Array.isArray(raw.entries)) {
     s.entries = raw.entries.filter(e => e && typeof e.date === 'string' && typeof e.exercise === 'string').map(e => ({
       id: e.id || uid(),
@@ -85,6 +109,36 @@ function saveState() {
 }
 
 function entriesOn(iso) { return state.entries.filter(e => e.date === iso); }
+
+/* ---- 训练部位：显式记录 + 根据动作自动识别 ---- */
+const PART_OPTIONS = ['胸', '背', '腿', '肩', '臂', '核心', '有氧'];
+const PART_RULES = [
+  ['胸', ['卧推', '飞鸟', '夹胸', '俯卧撑', '推胸']],
+  ['背', ['硬拉', '划船', '引体', '下拉', '直臂下压', '面拉']],
+  ['腿', ['深蹲', '腿举', '腿屈伸', '腿弯举', '箭步', '臀推', '保加利亚', '硬拉']],
+  ['肩', ['肩推', '推举', '侧平举', '前平举', '反向飞鸟']],
+  ['臂', ['弯举', '三头', '下压', '臂屈伸', '锤式', '曲伸']],
+  ['核心', ['卷腹', '平板', '举腿', '腹']],
+  ['有氧', ['跑步', '跑', '骑车', '椭圆', '划船机', '跳绳', '有氧']]
+];
+function inferParts(iso) {
+  const parts = new Set();
+  entriesOn(iso).forEach(e => {
+    PART_RULES.forEach(([part, kws]) => {
+      if (kws.some(k => e.exercise.includes(k))) parts.add(part);
+    });
+  });
+  return PART_OPTIONS.filter(p => parts.has(p));
+}
+function explicitParts(iso) {
+  const v = state.parts ? state.parts[iso] : undefined;
+  return Array.isArray(v) ? v : [];
+}
+function dayParts(iso) {
+  const ex = explicitParts(iso);
+  if (ex.length) return ex;
+  return inferParts(iso);
+}
 function allExercises() {
   const set = new Map();
   state.entries.forEach(e => set.set(e.exercise, (set.get(e.exercise) || 0) + 1));
@@ -152,9 +206,12 @@ function renderCalendar() {
     const iso = `${calYear}-${pad(calMonth + 1)}-${pad(d)}`;
     const gym = !!state.gymDays[iso];
     const hasEntry = state.entries.some(e => e.date === iso);
+    const parts = dayParts(iso);
+    const partText = parts.length ? parts.slice(0, 2).join('·') : '';
     const cls = ['day', gym ? 'gym' : '', iso === today ? 'today' : ''].filter(Boolean).join(' ');
     cells += `<button class="${cls}" data-act="open-day" data-date="${iso}">
-      <span>${d}</span>${hasEntry && !gym ? '<i class="dot"></i>' : (hasEntry && gym ? '<i class="dot"></i>' : '')}
+      <span class="dnum">${d}</span>
+      ${partText ? `<span class="dparts">${esc(partText)}</span>` : (hasEntry ? '<i class="dot"></i>' : '')}
     </button>`;
   }
   const trailing = (7 - ((startIdx + daysInMonth) % 7)) % 7;
@@ -163,7 +220,9 @@ function renderCalendar() {
   $('#view').innerHTML = `
     <div class="card">
       <div class="cal-head">
-        <div class="cal-title">${calYear}年${calMonth + 1}月</div>
+        <button class="cal-title-btn" data-act="open-month-picker" aria-label="选择月份">
+          ${calYear}年${calMonth + 1}月 <span class="chev">▾</span>
+        </button>
         <div class="cal-nav">
           <button class="nav-btn" data-act="prev-month" aria-label="上个月">‹</button>
           <button class="nav-btn" data-act="next-month" aria-label="下个月">›</button>
@@ -179,7 +238,7 @@ function renderCalendar() {
       <div class="cal-legend">
         <span><i></i>训练日</span>
         <span><i class="dotline"></i>有记录</span>
-        <span>点日期可标记 / 记录</span>
+        <span>数字下方 = 训练部位</span>
       </div>
     </div>
     <div style="height:12px"></div>
@@ -189,19 +248,28 @@ function renderCalendar() {
 function openDaySheet(iso) {
   const gym = !!state.gymDays[iso];
   const list = entriesOn(iso).sort((a, b) => a.exercise.localeCompare(b.exercise, 'zh'));
+  const chosen = explicitParts(iso);
+  const auto = inferParts(iso);
   const html = `
     <div class="sheet-grab"></div>
     <h3>${esc(fmtDateCN(iso))}</h3>
     <div class="sub">${gym ? '已标记为训练日' : '还没有标记训练日'}</div>
-    <div class="setting-row" style="border-bottom:0;padding:2px 2px 12px">
+    <div class="setting-row" style="border-bottom:0;padding:2px 2px 10px">
       <div><div class="t">今天去了健身房</div><div class="s">打开后日历上会显示红色标记</div></div>
       <label class="switch"><input type="checkbox" id="gymToggle" ${gym ? 'checked' : ''}><i></i></label>
+    </div>
+    <div class="field" style="margin:2px 0 8px">
+      <label>今天练了哪些部位（可多选）</label>
+      <div class="part-chips" id="partChips">
+        ${PART_OPTIONS.map(p => `<button class="part-chip ${chosen.includes(p) ? 'active' : ''}" data-act="toggle-part" data-date="${iso}" data-part="${p}">${p}</button>`).join('')}
+      </div>
+      <div class="tiny muted" id="partHint" style="margin-top:6px">${chosen.length ? '已手动选择，会显示在日历上' : (auto.length ? '自动识别：' + auto.join(' · ') + '（点上面标签可手动调整）' : '选好后会显示在日历数字下方')}</div>
     </div>
     <div class="section-title" style="margin:0 0 8px">
       <h2 style="font-size:15px">当天训练</h2>
       <button class="link-btn" data-act="add-entry" data-date="${iso}">+ 添加动作</button>
     </div>
-    ${list.length ? list.map(e => entryRowHTML(e)).join('') : `<div class="empty" style="padding:28px 0"><span class="big">🏋️</span>还没有训练记录<br><span class="tiny">点右上「+ 添加动作」开始记录</span></div>`}
+    ${list.length ? list.map(e => entryRowHTML(e)).join('') : `<div class="empty" style="padding:24px 0"><span class="big">🏋️</span>还没有训练记录<br><span class="tiny">点右上「+ 添加动作」开始记录</span></div>`}
   `;
   openSheet(html, () => {
     const tg = $('#gymToggle');
@@ -212,6 +280,58 @@ function openDaySheet(iso) {
       toast(tg.checked ? '已标记训练日 💪' : '已取消训练日标记');
     });
   });
+}
+
+function updatePartChipsUI(iso) {
+  const chosen = explicitParts(iso);
+  $$('#partChips .part-chip').forEach(b => b.classList.toggle('active', chosen.includes(b.dataset.part)));
+  const hint = $('#partHint');
+  if (hint) {
+    const auto = inferParts(iso);
+    hint.textContent = chosen.length ? '已手动选择：' + chosen.join(' · ') : (auto.length ? '自动识别：' + auto.join(' · ') + '（点上面标签可手动调整）' : '选好后会显示在日历数字下方');
+  }
+}
+
+function togglePart(iso, part) {
+  if (!state.parts) state.parts = {};
+  const arr = explicitParts(iso).slice();
+  const idx = arr.indexOf(part);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(part);
+  if (arr.length) state.parts[iso] = arr; else delete state.parts[iso];
+  saveState();
+  render();
+  updatePartChipsUI(iso);
+}
+
+/* ---------------- 月份选择器 ---------------- */
+let pickYear = calYear;
+function monthGridHTML() {
+  return Array.from({ length: 12 }, (_, i) => {
+    const active = pickYear === calYear && i === calMonth;
+    return `<button class="month-cell ${active ? 'active' : ''}" data-act="pick-month" data-month="${i}">${i + 1}月</button>`;
+  }).join('');
+}
+function refreshMonthPicker() {
+  const lbl = $('#pickYearLabel');
+  if (lbl) lbl.textContent = pickYear + '年';
+  const grid = $('#monthGrid');
+  if (grid) grid.innerHTML = monthGridHTML();
+}
+function openMonthPicker() {
+  pickYear = calYear;
+  const html = `
+    <div class="sheet-grab"></div>
+    <h3>选择月份</h3>
+    <div class="sub">可以自由跳到任意年月</div>
+    <div class="month-nav">
+      <button class="nav-btn" data-act="pick-year-prev" aria-label="上一年">‹</button>
+      <b id="pickYearLabel">${pickYear}年</b>
+      <button class="nav-btn" data-act="pick-year-next" aria-label="下一年">›</button>
+    </div>
+    <div class="month-grid" id="monthGrid">${monthGridHTML()}</div>
+    <button class="link-btn" data-act="pick-this-month">回到本月</button>
+  `;
+  openSheet(html);
 }
 
 /* ---------------- 记录列表 ---------------- */
@@ -238,10 +358,12 @@ function renderRecords() {
     const gym = !!state.gymDays[iso];
     const list = byDate.get(iso).sort((a, b) => entryTopWeight(b) - entryTopWeight(a));
     const volume = list.reduce((a, e) => a + entryVolume(e), 0);
+    const parts = dayParts(iso);
     return `<div class="day-group">
       <div class="day-group-head">
         <b>${esc(fmtDateCN(iso))}</b>
         ${gym ? '<span class="badge">训练日</span>' : ''}
+        ${parts.length ? `<span class="part-tag">${esc(parts.join('·'))}</span>` : ''}
         <span class="muted tiny" style="margin-left:auto">${list.length} 个动作 · 容量 ${Math.round(volume)}kg</span>
       </div>
       ${list.map(e => entryRowHTML(e)).join('')}
@@ -369,33 +491,80 @@ function saveEntryFromSheet(entryId) {
 }
 
 /* ---------------- 曲线 ---------------- */
+const METRIC_LABELS = { max: '最大重量', e1rm: '估算 1RM', vol: '训练容量' };
+const RANGE_LABELS = [['all', '全部'], ['90', '近3月'], ['30', '近1月']];
+
 function seriesFor(exercise) {
   const byDate = new Map();
   state.entries.filter(e => e.exercise === exercise).forEach(e => {
-    const date = e.date;
-    let val = 0;
+    let val;
     if (chartMetric === 'e1rm') {
+      val = 0;
       e.sets.forEach(s => { if (s.w > 0 && s.r > 0) val = Math.max(val, s.w * (1 + s.r / 30)); });
+    } else if (chartMetric === 'vol') {
+      val = e.sets.reduce((a, s) => a + (s.w || 0) * (s.r || 0), 0);
     } else {
       val = Math.max(0, ...e.sets.map(s => s.w || 0));
     }
     val = Math.round(val * 10) / 10;
-    if (!byDate.has(date) || byDate.get(date) < val) byDate.set(date, val);
+    const prev = byDate.get(e.date);
+    if (chartMetric === 'vol') byDate.set(e.date, (prev || 0) + val);
+    else byDate.set(e.date, prev === undefined ? val : Math.max(prev, val));
   });
   return Array.from(byDate.entries())
     .map(([date, value]) => ({ date, value }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function rangeCutoff() {
+  if (chartRange === 'all') return null;
+  const days = chartRange === '30' ? 30 : 90;
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return isoDate(d);
+}
+
+function fmtAxis(v, metric) {
+  if (metric === 'vol') {
+    if (v >= 10000) return (v / 1000).toFixed(v >= 20000 ? 0 : 1) + 't';
+    if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+    return Math.round(v);
+  }
+  return Math.round(v * 10) / 10;
+}
+function fmtMetric(v) {
+  if (chartMetric === 'vol') return Math.round(v) + 'kg';
+  return fmtKg(v);
+}
+
+function smoothPath(coords) {
+  if (!coords.length) return '';
+  if (coords.length === 1) return '';
+  let d = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const p0 = coords[i - 1] || coords[i];
+    const p1 = coords[i];
+    const p2 = coords[i + 1];
+    const p3 = coords[i + 2] || p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 function buildChartSVG(points) {
-  const W = 360, H = 224, L = 42, R = 14, T = 18, B = 32;
+  const W = 360, H = 240, L = 44, R = 14, T = 26, B = 36;
   const iw = W - L - R, ih = H - T - B;
   if (!points.length) return '';
   const vals = points.map(p => p.value);
   const vMin = Math.min(...vals), vMax = Math.max(...vals);
   let lo = vMin, hi = vMax;
-  if (hi - lo < 1) { lo = Math.max(0, lo - 2); hi = hi + 2; }
-  else { const padV = Math.max(1, (hi - lo) * 0.12); lo = Math.max(0, lo - padV); hi = hi + padV; }
+  const span = hi - lo;
+  if (span < 1) { lo = Math.max(0, lo - 2); hi = hi + 2; }
+  else { const padV = Math.max(0.5, span * 0.16); lo = Math.max(0, lo - padV); hi = hi + padV; }
 
   const t0 = parseISO(points[0].date).getTime();
   const t1 = parseISO(points[points.length - 1].date).getTime();
@@ -411,18 +580,36 @@ function buildChartSVG(points) {
   for (let i = 0; i <= gridN; i++) {
     const v = lo + (hi - lo) * i / gridN;
     const y = yAt(v);
-    grid += `<line x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}" style="stroke:var(--line);stroke-width:1"/>`;
-    grid += `<text x="${L - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" style="fill:var(--muted);font-size:10px">${Math.round(v * 10) / 10}</text>`;
+    grid += `<line class="chart-grid" x1="${L}" y1="${y.toFixed(1)}" x2="${W - R}" y2="${y.toFixed(1)}"/>`;
+    grid += `<text class="chart-axis" x="${L - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${fmtAxis(v, chartMetric)}</text>`;
   }
 
   const coords = points.map((p, i) => ({ x: xAt(i), y: yAt(p.value), p }));
-  const line = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
-  const area = `M ${coords[0].x.toFixed(1)} ${(T + ih).toFixed(1)} L ` + coords.map(c => `${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' L ') + ` L ${coords[coords.length - 1].x.toFixed(1)} ${(T + ih).toFixed(1)} Z`;
+  const lineD = smoothPath(coords);
+  const baseY = (T + ih).toFixed(1);
+  const areaD = lineD + ` L ${coords[coords.length - 1].x.toFixed(1)} ${baseY} L ${coords[0].x.toFixed(1)} ${baseY} Z`;
+
+  // 最高点标记
+  let prIdx = 0;
+  points.forEach((p, i) => { if (p.value > points[prIdx].value) prIdx = i; });
+  const pr = coords[prIdx];
+  let prMark = '';
+  if (points.length > 1) {
+    prMark = `<circle class="chart-pr-ring" cx="${pr.x.toFixed(1)}" cy="${pr.y.toFixed(1)}" r="7"/>
+      <text class="chart-pr-label" x="${Math.min(pr.x + 9, W - R - 20).toFixed(1)}" y="${Math.max(pr.y - 9, 12).toFixed(1)}">最高</text>`;
+  }
+
+  // 选中点
+  let selMark = '';
+  if (chartSel >= 0 && chartSel < coords.length) {
+    const c = coords[chartSel];
+    selMark = `<line class="chart-sel" x1="${c.x.toFixed(1)}" y1="${T}" x2="${c.x.toFixed(1)}" y2="${baseY}"/>
+      <circle class="chart-dot sel" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="5.5" data-idx="${chartSel}"/>`;
+  }
 
   const dots = coords.map((c, i) => {
-    const sel = i === chartSel;
-    return `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${sel ? 6 : 4}" data-idx="${i}"
-      style="fill:${sel ? '#fff' : 'var(--accent)'};stroke:var(--accent);stroke-width:${sel ? 3 : 2}"/>`;
+    if (i === chartSel) return '';
+    return `<circle class="chart-dot" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3.6" data-idx="${i}"/>`;
   }).join('');
 
   const labels = [];
@@ -430,27 +617,34 @@ function buildChartSVG(points) {
   const idxs = n === 1 ? [0] : (n === 2 ? [0, 1] : [0, Math.floor((n - 1) / 2), n - 1]);
   idxs.forEach(i => {
     const c = coords[i];
-    labels.push(`<text x="${c.x.toFixed(1)}" y="${H - 10}" text-anchor="middle" style="fill:var(--muted);font-size:10px">${fmtShort(points[i].date)}</text>`);
+    labels.push(`<text class="chart-axis" x="${c.x.toFixed(1)}" y="${H - 12}" text-anchor="middle">${fmtShort(points[i].date)}</text>`);
   });
 
-  // 选中点数值标签
+  // 选中值标签
   let tag = '';
   if (chartSel >= 0 && chartSel < coords.length) {
     const c = coords[chartSel];
-    const tx = Math.min(Math.max(c.x, L + 24), W - R - 24);
-    tag = `<text x="${tx.toFixed(1)}" y="${Math.max(c.y - 12, 14).toFixed(1)}" text-anchor="middle"
-      style="fill:var(--accent);font-size:11px;font-weight:700">${fmtShort(c.p.date)} · ${fmtKg(c.p.value)}</text>`;
+    const tx = Math.min(Math.max(c.x, L + 34), W - R - 34);
+    const label = `${fmtShort(c.p.date)} · ${fmtMetric(c.p.value)}`;
+    const ty = Math.max(c.y - 14, 16);
+    const w = label.length * 5.6 + 16;
+    tag = `<rect x="${(tx - w / 2).toFixed(1)}" y="${(ty - 12).toFixed(1)}" width="${w.toFixed(1)}" height="17" rx="8.5" class="chart-tag-bg"/>
+      <text class="chart-tag" x="${tx.toFixed(1)}" y="${(ty).toFixed(1)}" text-anchor="middle">${label}</text>`;
   }
 
-  return `<svg viewBox="0 0 ${W} ${H}" aria-label="重量变化曲线">
-    <defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="var(--accent)" stop-opacity=".22"/>
-      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
-    </linearGradient></defs>
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" aria-label="进步曲线">
+    <defs>
+      <linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" style="stop-color:var(--accent);stop-opacity:.35"/>
+        <stop offset="100%" style="stop-color:var(--accent);stop-opacity:0"/>
+      </linearGradient>
+    </defs>
     ${grid}
-    <path d="${area}" style="fill:url(#gArea)"/>
-    <polyline points="${line}" style="fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"/>
+    <path class="chart-area" d="${areaD}"/>
+    <path class="chart-line" d="${lineD}"/>
+    ${prMark}
     ${dots}
+    ${selMark}
     ${labels}
     ${tag}
   </svg>`;
@@ -459,43 +653,65 @@ function buildChartSVG(points) {
 function renderCharts() {
   const exercises = allExercises();
   if (!exercises.length) {
-    $('#view').innerHTML = `<div class="empty"><span class="big">📈</span>还没有训练记录<br><span class="tiny">先在「记录」里添加几次训练，这里就会生成重量曲线</span></div>`;
+    $('#view').innerHTML = `<div class="empty"><span class="big">📈</span>还没有训练记录<br><span class="tiny">先在「记录」里添加几次训练，这里就会生成进步曲线</span></div>`;
     return;
   }
   if (!chartExercise || !exercises.includes(chartExercise)) chartExercise = exercises[0];
-  const points = seriesFor(chartExercise);
+  const allPoints = seriesFor(chartExercise);
+  const cutoff = rangeCutoff();
+  const points = cutoff ? allPoints.filter(p => p.date >= cutoff) : allPoints;
   const values = points.map(p => p.value);
   const maxV = values.length ? Math.max(...values) : 0;
   const lastV = values.length ? values[values.length - 1] : 0;
   const firstV = values.length ? values[0] : 0;
   const delta = lastV - firstV;
-  const totalSessions = points.length;
+  const isVol = chartMetric === 'vol';
+  const prHit = values.length > 1 && lastV >= maxV - 0.001;
+
+  const rows = points.slice().reverse().slice(0, 10).map((p, i, arr) => {
+    const prev = arr[i + 1];
+    const d = prev ? Math.round((p.value - prev.value) * 10) / 10 : null;
+    const arrow = d == null ? '' : (d > 0 ? `<span class="delta up">▲ ${isVol ? Math.round(d) : fmtKg(d)}</span>` : (d < 0 ? `<span class="delta down">▼ ${isVol ? Math.round(-d) : fmtKg(-d)}</span>` : `<span class="delta flat">—</span>`));
+    return `<div class="chart-row">
+      <span class="d">${esc(fmtShort(p.date))}</span>
+      <span class="v">${isVol ? Math.round(p.value) + 'kg' : fmtKg(p.value)}</span>
+      ${arrow}
+    </div>`;
+  }).join('');
+
+  const rangeChips = RANGE_LABELS.map(([k, label]) =>
+    `<button class="range-chip ${chartRange === k ? 'active' : ''}" data-act="range" data-range="${k}">${label}</button>`).join('');
+  const metricBtns = [['max', '最大重量'], ['e1rm', '估算 1RM'], ['vol', '训练容量']].map(([k, label]) =>
+    `<button class="${chartMetric === k ? 'active' : ''}" data-act="metric" data-metric="${k}">${label}</button>`).join('');
 
   $('#view').innerHTML = `
     <div class="chips">
       ${exercises.map(x => `<button class="chip ${x === chartExercise ? 'active' : ''}" data-act="pick-exercise" data-ex="${esc(x)}">${esc(x)}</button>`).join('')}
     </div>
-    <div class="seg">
-      <button class="${chartMetric === 'max' ? 'active' : ''}" data-act="metric" data-metric="max">最大重量</button>
-      <button class="${chartMetric === 'e1rm' ? 'active' : ''}" data-act="metric" data-metric="e1rm">估算 1RM</button>
-    </div>
+    <div class="seg">${metricBtns}</div>
+    <div class="range-row">${rangeChips}</div>
+    ${points.length ? `
     <div class="card chart-card">
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">${esc(chartExercise)}<span class="chart-metric">${METRIC_LABELS[chartMetric]}</span></div>
+          <div class="chart-sub">${fmtShort(points[0].date)} – ${fmtShort(points[points.length - 1].date)} · 共 ${points.length} 次${prHit ? ' <span class="pr-pill">新纪录</span>' : ''}</div>
+        </div>
+        <div class="chart-big">${isVol ? Math.round(lastV) + '<i>kg</i>' : fmtKg(lastV).replace('kg', '<i>kg</i>')}</div>
+      </div>
       <div class="chart-wrap">${buildChartSVG(points)}</div>
       <div class="chart-stats">
-        <div class="stat"><b>${totalSessions}</b><span>训练次数</span></div>
-        <div class="stat"><b>${fmtKg(maxV)}</b><span>最重</span></div>
-        <div class="stat"><b>${fmtKg(lastV)}</b><span>最近</span></div>
-        <div class="stat"><b style="color:${delta >= 0 ? 'var(--accent)' : 'var(--muted)'}">${delta > 0 ? '+' : ''}${fmtKg(delta)}</b><span>对比首次</span></div>
+        <div class="stat"><b>${points.length}</b><span>训练次数</span></div>
+        <div class="stat"><b>${isVol ? Math.round(maxV) : fmtKg(maxV)}</b><span>${isVol ? '最高容量(kg)' : '最重'}</span></div>
+        <div class="stat"><b>${isVol ? Math.round(lastV) : fmtKg(lastV)}</b><span>最近</span></div>
+        <div class="stat"><b class="${delta >= 0 ? 'accent' : 'muted'}">${delta > 0 ? '+' : ''}${isVol ? Math.round(delta) : fmtKg(delta)}</b><span>对比首次</span></div>
       </div>
     </div>
     <div class="card chart-list" style="margin-top:14px">
-      <div class="section-title" style="margin:0 0 4px"><h2 style="font-size:15px">${esc(chartExercise)} 记录</h2><span class="muted tiny">点曲线上的点可查看数值</span></div>
-      ${points.slice().reverse().slice(0, 10).map(p => `
-        <div class="chart-row">
-          <span class="d">${esc(fmtShort(p.date))}</span>
-          <span class="v">${fmtKg(p.value)}</span>
-        </div>`).join('')}
-    </div>
+      <div class="section-title" style="margin:0 0 4px"><h2 style="font-size:15px">最近记录</h2><span class="muted tiny">点曲线上的点看数值</span></div>
+      ${rows || '<div class="empty" style="padding:24px 0">这个时间段还没有记录</div>'}
+    </div>` : `
+    <div class="empty"><span class="big">📈</span>这个时间段还没有记录<br><span class="tiny">换一个时间范围，或先去记录一次训练</span></div>`}
     <div style="height:14px"></div>
   `;
 }
@@ -516,6 +732,10 @@ function renderSettings() {
       </div>
     </div>
     <div class="card" style="margin-bottom:14px">
+      <div class="setting-row">
+        <div><div class="t">深色模式</div><div class="s">高级黑主题；关掉切换为浅色</div></div>
+        <label class="switch"><input type="checkbox" id="themeToggle" ${theme === 'dark' ? 'checked' : ''}><i></i></label>
+      </div>
       <div class="setting-row">
         <div><div class="t">导出备份</div><div class="s">保存为 JSON 文件，可存到「文件」App</div></div>
         <button class="action" data-act="export">导出</button>
@@ -544,6 +764,11 @@ function renderSettings() {
     </div>
     <div style="height:24px"></div>
   `;
+  const tt = $('#themeToggle');
+  if (tt) tt.addEventListener('change', () => {
+    setTheme(tt.checked ? 'dark' : 'light');
+    toast(tt.checked ? '已切换深色模式' : '已切换浅色模式');
+  });
 }
 
 /* ---------------- 导出 / 导入 ---------------- */
@@ -608,7 +833,7 @@ function buildDemoState() {
     }
     day.setDate(day.getDate() + 1);
   }
-  return { gymDays, entries, meta: { demo: true, createdAt: new Date().toISOString() } };
+  return { gymDays, parts: {}, entries, meta: { demo: true, createdAt: new Date().toISOString() } };
 }
 
 /* ---------------- 路由 / 渲染 ---------------- */
@@ -673,10 +898,36 @@ document.addEventListener('click', (ev) => {
       chartExercise = el.dataset.ex; chartSel = -1; renderCharts(); break;
     case 'metric':
       chartMetric = el.dataset.metric; chartSel = -1; renderCharts(); break;
+    case 'range':
+      chartRange = el.dataset.range; chartSel = -1; renderCharts(); break;
     case 'export': exportData(); break;
     case 'import': $('#importFile')?.click(); break;
     case 'seed-demo': seedDemo(); break;
     case 'clear-all': clearAll(); break;
+    case 'open-month-picker': openMonthPicker(); break;
+    case 'pick-year-prev':
+      pickYear--; refreshMonthPicker(); break;
+    case 'pick-year-next':
+      pickYear++; refreshMonthPicker(); break;
+    case 'pick-month': {
+      calYear = pickYear;
+      calMonth = Number(el.dataset.month);
+      closeSheet();
+      render();
+      toast(`${calYear}年${calMonth + 1}月`);
+      break;
+    }
+    case 'pick-this-month': {
+      const n = new Date();
+      calYear = n.getFullYear(); calMonth = n.getMonth();
+      closeSheet();
+      render();
+      toast('已回到本月');
+      break;
+    }
+    case 'toggle-part':
+      togglePart(el.dataset.date, el.dataset.part);
+      break;
   }
 });
 
@@ -737,6 +988,7 @@ document.getElementById('btnToday').addEventListener('click', () => {
   const sheetParam = params.get('sheet');
   if (sheetParam === 'day') setTimeout(() => openDaySheet(params.get('date') || todayISO()), 120);
   else if (sheetParam === 'entry') setTimeout(() => openEntrySheet(params.get('date') || todayISO()), 120);
+  else if (sheetParam === 'month') setTimeout(() => openMonthPicker(), 120);
 
   // 调试：?debug=1 时显示视口宽度与超宽元素
   if (params.get('debug') === '1') {
