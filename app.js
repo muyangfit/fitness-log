@@ -56,7 +56,7 @@ function fmtShort(iso) {
 }
 function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
 
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 
 /* 判断是否 iOS「添加到主屏幕」运行：用一个探针测真实的安全区数值 */
 function detectEnv() {
@@ -1206,6 +1206,12 @@ document.addEventListener('click', (ev) => {
     case 'export': exportData(); break;
     case 'export-ics': exportICS(); break;
     case 'check-update': checkUpdate(); break;
+    case 'hide-tip': {
+      const tip = document.getElementById('browserTip');
+      if (tip) tip.classList.add('hidden');
+      try { localStorage.setItem('fitlog.hideBrowserTip', '1'); } catch (e) {}
+      break;
+    }
     case 'import': $('#importFile')?.click(); break;
     case 'seed-demo': seedDemo(); break;
     case 'clear-all': clearAll(); break;
@@ -1298,6 +1304,18 @@ document.getElementById('btnToday').addEventListener('click', () => {
     calYear = y; calMonth = m - 1;
   }
   if (params.get('tab')) tab = params.get('tab');
+
+  // 如果是在浏览器（Safari）里打开，提示添加到主屏幕；主屏幕 App 打开不会出现
+  (function browserTip() {
+    if (params.get('notip') === '1') return;
+    const standalone = navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (standalone) return;
+    let hidden = false;
+    try { hidden = localStorage.getItem('fitlog.hideBrowserTip') === '1'; } catch (e) {}
+    if (hidden) return;
+    const el = document.getElementById('browserTip');
+    if (el) el.classList.remove('hidden');
+  })();
   if (params.get('ex')) chartExercise = params.get('ex');
   if (!chartExercise) chartExercise = mostCommonExercise();
 
