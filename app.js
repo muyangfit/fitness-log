@@ -56,7 +56,7 @@ function fmtShort(iso) {
 }
 function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
 
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 
 /* 判断是否 iOS「添加到主屏幕」运行：用一个探针测真实的安全区数值 */
 function detectEnv() {
