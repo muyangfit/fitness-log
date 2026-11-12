@@ -30,7 +30,7 @@ html.light{
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%}
-html{-webkit-text-size-adjust:100%}
+html{height:100%;background:var(--bg)}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;
   background:var(--bg);
@@ -39,9 +39,13 @@ body{
   line-height:1.45;
   display:flex;
   flex-direction:column;
-  height:100dvh;
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  height:auto;
   overflow:hidden;
-  position:relative;
   overscroll-behavior-y:none;
 }
 button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
@@ -329,6 +333,14 @@ main > *:not(.page-cal){flex:0 0 auto}
 .tab .tab-label{font-size:10px;font-weight:600}
 .tab.active{color:var(--accent)}
 .tab.active .tab-ico{filter:none;opacity:1}
+
+/* 底部安全区填充：保证 iPhone 圆角/Home 指示条区域也被标签栏颜色覆盖 */
+#safeFill{
+  position:fixed;left:0;right:0;bottom:0;z-index:31;pointer-events:none;
+  height:env(safe-area-inset-bottom,0px);
+  height:max(env(safe-area-inset-bottom,0px), calc(100vh - 100dvh));
+  background:var(--card);
+}
 
 /* ============ Toast ============ */
 .toast{
