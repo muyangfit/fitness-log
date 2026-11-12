@@ -56,7 +56,7 @@ function fmtShort(iso) {
 }
 function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
 
-const APP_VERSION = 'v12';
+const APP_VERSION = 'v13';
 
 /* 判断是否 iOS「添加到主屏幕」运行：用一个探针测真实的安全区数值 */
 function detectEnv() {
@@ -1050,6 +1050,9 @@ function renderSettings() {
     </div>
     <div class="hint" style="text-align:center;margin-top:6px;font-size:11px;opacity:.75">
       窗口 ${Math.round(window.innerWidth)}×${Math.round(window.innerHeight)} · 屏幕 ${screen.width}×${screen.height} · 安全区 ${safeBottomPx()}px · 独立 ${navigator.standalone ? '是' : '否'}
+    </div>
+    <div class="hint" style="text-align:center;margin-top:2px;font-size:11px;opacity:.6">
+      可视高度 ${document.documentElement.clientHeight} · 屏幕高 ${screen.height} · vv ${window.visualViewport ? Math.round(window.visualViewport.height) : '-'}
     </div>
     <div style="height:16px"></div>
   `;
