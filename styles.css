@@ -347,6 +347,12 @@ main > *:not(.page-cal){flex:0 0 auto}
 html.ios-standalone .tabbar{
   padding-bottom:calc(8px + max(env(safe-area-inset-bottom, 0px), 34px));
 }
+/* 兜底：页面最底部 34px 用标签栏同色填住（在标签栏下面一层，不会遮挡文字） */
+body::after{
+  content:'';position:fixed;left:0;right:0;bottom:0;height:34px;
+  height:max(env(safe-area-inset-bottom, 0px), 34px);
+  background:var(--card);z-index:24;pointer-events:none;
+}
 
 /* ============ Toast ============ */
 .toast{
