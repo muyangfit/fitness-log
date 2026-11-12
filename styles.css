@@ -334,6 +334,15 @@ main > *:not(.page-cal){flex:0 0 auto}
 .tab.active{color:var(--accent)}
 .tab.active .tab-ico{filter:none;opacity:1}
 
+/* 浏览器内打开提示（添加到主屏幕后从图标打开则不会出现） */
+.browser-tip{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  margin:0 12px 8px;padding:10px 12px;border-radius:14px;
+  background:var(--accent-soft);color:var(--accent);
+  font-size:12px;line-height:1.5;font-weight:600;
+}
+.browser-tip button{color:var(--accent);font-size:12px;font-weight:800;text-decoration:underline;flex:0 0 auto}
+
 /* iOS 添加到主屏幕后：即使系统不上报安全区，也把底部 34px 留给标签栏，避免露出空隙 */
 html.ios-standalone .tabbar{
   padding-bottom:calc(8px + max(env(safe-area-inset-bottom, 0px), 34px));
