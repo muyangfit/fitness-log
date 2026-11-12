@@ -1,4 +1,4 @@
-const CACHE = 'fitlog-v14';
+const CACHE = 'fitlog-v15';
 const ASSETS = [
   './',
   './index.html',
