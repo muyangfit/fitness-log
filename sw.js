@@ -1,4 +1,4 @@
-const CACHE = 'fitlog-v10';
+const CACHE = 'fitlog-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -34,11 +34,9 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// 策略：
-// - 页面导航：先网络（拿到最新 HTML），失败再回缓存
+// 策略�?// - 页面导航：先网络（拿到最�?HTML），失败再回缓存
 // - 样式/脚本：先网络，失败回缓存
-// - 图片等：先缓存，没有再网络
-self.addEventListener('fetch', (e) => {
+// - 图片等：先缓存，没有再网�?self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
