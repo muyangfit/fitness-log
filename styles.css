@@ -341,6 +341,11 @@ main > *:not(.page-cal){flex:0 0 auto}
   height:max(env(safe-area-inset-bottom,0px), calc(100vh - 100dvh));
   background:var(--card);
 }
+/* iOS 添加到主屏幕后：即使系统不上报安全区，也强制铺满底部 34px（Home 指示条区域） */
+html.ios-standalone #safeFill{
+  height:max(env(safe-area-inset-bottom, 0px), 34px);
+  height:max(env(safe-area-inset-bottom, 0px), 34px, calc(100vh - 100dvh));
+}
 
 /* ============ Toast ============ */
 .toast{
