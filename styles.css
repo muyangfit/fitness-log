@@ -30,7 +30,7 @@ html.light{
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%}
-html{height:100%;background:var(--bg)}
+html{height:100%;background:var(--card)}
 body{
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",sans-serif;
   background:var(--bg);
@@ -334,17 +334,9 @@ main > *:not(.page-cal){flex:0 0 auto}
 .tab.active{color:var(--accent)}
 .tab.active .tab-ico{filter:none;opacity:1}
 
-/* 底部安全区填充：保证 iPhone 圆角/Home 指示条区域也被标签栏颜色覆盖 */
-#safeFill{
-  position:fixed;left:0;right:0;bottom:0;z-index:31;pointer-events:none;
-  height:env(safe-area-inset-bottom,0px);
-  height:max(env(safe-area-inset-bottom,0px), calc(100vh - 100dvh));
-  background:var(--card);
-}
-/* iOS 添加到主屏幕后：即使系统不上报安全区，也强制铺满底部 34px（Home 指示条区域） */
-html.ios-standalone #safeFill{
-  height:max(env(safe-area-inset-bottom, 0px), 34px);
-  height:max(env(safe-area-inset-bottom, 0px), 34px, calc(100vh - 100dvh));
+/* iOS 添加到主屏幕后：即使系统不上报安全区，也把底部 34px 留给标签栏，避免露出空隙 */
+html.ios-standalone .tabbar{
+  padding-bottom:calc(8px + max(env(safe-area-inset-bottom, 0px), 34px));
 }
 
 /* ============ Toast ============ */
