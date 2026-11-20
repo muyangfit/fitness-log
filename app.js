@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    健身记录 App — 纯前端 PWA，数据保存在手机浏览器本地
    ========================================================= */
 'use strict';
@@ -56,7 +56,7 @@ function fmtShort(iso) {
 }
 function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
 
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 
 /* 判断是否 iOS「添加到主屏幕」运行：用一个探针测真实的安全区数值 */
 function detectEnv() {
@@ -142,7 +142,15 @@ function normalizeState(raw) {
   if (raw.parts && typeof raw.parts === 'object') {
     s.parts = {};
     Object.keys(raw.parts).forEach(k => {
-      if (Array.isArray(raw.parts[k])) s.parts[k] = raw.parts[k].filter(x => typeof x === 'string');
+      if (Array.isArray(raw.parts[k])) {
+        const out = [];
+        raw.parts[k].forEach(p => {
+          if (typeof p !== 'string') return;
+          const list = p === '臂' ? ['二头', '三头'] : [p];
+          list.forEach(x => { if (!out.includes(x)) out.push(x); });
+        });
+        if (out.length) s.parts[k] = out;
+      }
     });
   }
   if (Array.isArray(raw.entries)) {
@@ -182,28 +190,39 @@ function saveState() {
 function entriesOn(iso) { return state.entries.filter(e => e.date === iso); }
 
 /* ---- 训练部位：显式记录 + 根据动作自动识别 ---- */
-const PART_OPTIONS = ['胸', '背', '腿', '肩', '臂', '核心', '有氧'];
+const PART_OPTIONS = ['胸', '背', '腿', '肩', '二头', '三头', '核心', '有氧'];
 const PART_RULES = [
-  ['胸', ['卧推', '飞鸟', '夹胸', '俯卧撑', '推胸']],
+  ['胸', ['卧推', '飞鸟', '夹胸', '俯卧撑', '推胸', '双杠']],
   ['背', ['硬拉', '划船', '引体', '下拉', '直臂下压', '面拉']],
   ['腿', ['深蹲', '腿举', '腿屈伸', '腿弯举', '箭步', '臀推', '保加利亚', '硬拉']],
   ['肩', ['肩推', '推举', '侧平举', '前平举', '反向飞鸟']],
-  ['臂', ['弯举', '三头', '下压', '臂屈伸', '锤式', '曲伸']],
+  ['二头', ['二头', '弯举', '锤式', '牧师凳']],
+  ['三头', ['三头', '下压', '臂屈伸', '曲伸', '窄距', '颈后']],
   ['核心', ['卷腹', '平板', '举腿', '腹']],
   ['有氧', ['跑步', '跑', '骑车', '椭圆', '划船机', '跳绳', '有氧']]
 ];
-function inferParts(iso) {
+// 老版本存的是「臂」，读取时自动拆成「二头 + 三头」
+function migratePart(p) {
+  return p === '臂' ? ['二头', '三头'] : [p];
+}
+function inferFromNames(names) {
   const parts = new Set();
-  entriesOn(iso).forEach(e => {
+  names.forEach(name => {
     PART_RULES.forEach(([part, kws]) => {
-      if (kws.some(k => e.exercise.includes(k))) parts.add(part);
+      if (kws.some(k => String(name).includes(k))) parts.add(part);
     });
   });
   return PART_OPTIONS.filter(p => parts.has(p));
 }
+function inferParts(iso) {
+  return inferFromNames(entriesOn(iso).map(e => e.exercise));
+}
 function explicitParts(iso) {
   const v = state.parts ? state.parts[iso] : undefined;
-  return Array.isArray(v) ? v : [];
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  v.forEach(p => migratePart(p).forEach(x => { if (!out.includes(x)) out.push(x); }));
+  return out;
 }
 function dayParts(iso) {
   const ex = explicitParts(iso);
@@ -1325,7 +1344,7 @@ document.getElementById('btnToday').addEventListener('click', () => {
   window.__fitlog = {
     get state() { return state; },
     saveState, render, switchTab, openEntrySheet, openDaySheet, closeSheet,
-    lunarOf, solarToLunar
+    lunarOf, solarToLunar, PART_OPTIONS, inferFromNames
   };
 
   // 预览用：?sheet=day / ?sheet=entry 直接打开对应弹层（方便截图演示）
@@ -1374,3 +1393,4 @@ document.getElementById('btnToday').addEventListener('click', () => {
     });
   }
 })();
+
