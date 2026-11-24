@@ -1,10 +1,10 @@
-﻿const CACHE = 'fitlog-v18';
+﻿const CACHE = 'fitlog-v19';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.webmanifest',
+  './styles.css?v=19',
+  './app.js?v=19',
+  './manifest.webmanifest?v=19',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
