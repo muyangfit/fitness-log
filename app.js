@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    健身记录 App — 纯前端 PWA，数据保存在手机浏览器本地
    ========================================================= */
 'use strict';
@@ -56,7 +56,7 @@ function fmtShort(iso) {
 }
 function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
 
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v18';
 
 /* 判断是否 iOS「添加到主屏幕」运行：用一个探针测真实的安全区数值 */
 function detectEnv() {
@@ -297,14 +297,16 @@ function renderCalendar() {
     const gym = !!state.gymDays[iso];
     const hasEntry = state.entries.some(e => e.date === iso);
     const parts = dayParts(iso);
-    const partText = parts.length ? parts.slice(0, 2).join('·') : '';
+    const partsHTML = parts.length
+      ? `<span class="dparts">${parts.map(p => `<span class="dp">${esc(p)}</span>`).join('')}</span>`
+      : '';
     const ld = solarToLunar(calYear, calMonth + 1, d);
     const lunarText = lunarDayText(ld);
     const cls = ['day', gym ? 'gym' : '', iso === today ? 'today' : ''].filter(Boolean).join(' ');
     cells += `<button class="${cls}" data-act="open-day" data-date="${iso}">
       <span class="dnum">${d}</span>
       <span class="dlunar">${esc(lunarText)}</span>
-      ${partText ? `<span class="dparts">${esc(partText)}</span>` : (hasEntry ? '<i class="dot"></i>' : '')}
+      ${partsHTML || (hasEntry ? '<i class="dot"></i>' : '')}
     </button>`;
   }
   const trailing = (7 - ((startIdx + daysInMonth) % 7)) % 7;
@@ -1315,6 +1317,9 @@ document.getElementById('btnToday').addEventListener('click', () => {
 
   if (params.get('demo') === '1') {
     state = buildDemoState();   // 演示模式：不写入本地存储
+  }
+  if (params.get('demo') === '1' && params.get('setparts')) {
+    state.parts[todayISO()] = params.get('setparts').split(',').filter(Boolean).slice(0, 6);
   }
   const now = new Date();
   calYear = now.getFullYear(); calMonth = now.getMonth();
